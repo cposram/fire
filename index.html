@@ -9,7 +9,7 @@
         @media print {
             .no-print { display: none !important; }
             body { background: white; padding: 0; }
-            .shadow-lg { box-shadow: none; }
+            .shadow-sm { box-shadow: none; }
         }
     </style>
 </head>
@@ -20,7 +20,7 @@
         <div class="flex flex-col md:flex-row justify-between items-end border-b pb-4 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">0050 退休動態提領戰情室</h1>
-                <p class="text-gray-500 mt-1">動態護欄策略：熊市啟動質押護城河，牛市獲利自動去化債務</p>
+                <p class="text-gray-500 mt-1">動態護欄策略：精確指示實務操作金額與資金流向</p>
             </div>
             <button onclick="window.print()" class="no-print bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded shadow transition w-full md:w-auto">
                 🖨️ 列印報表 / 匯出 PDF
@@ -33,27 +33,28 @@
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">起始年齡</label>
-                    <input type="number" id="startAge" value="45" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 bg-gray-100 text-gray-500" readonly>
+                    <!-- 解除 readonly，加入 onchange 觸發重算 -->
+                    <input type="number" id="startAge" value="45" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">起始本金 (元)</label>
-                    <input type="number" id="initialCapital" value="20000000" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                    <input type="number" id="initialCapital" value="20000000" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">提領率 (%)</label>
-                    <input type="number" id="withdrawRate" value="4" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                    <input type="number" id="withdrawRate" value="4" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">通膨率 (%)</label>
-                    <input type="number" id="inflationRate" value="2" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                    <input type="number" id="inflationRate" value="2" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">平時預估報酬 (%)</label>
-                    <input type="number" id="baseReturn" value="8" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                    <input type="number" id="baseReturn" value="8" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">質押借款利率 (%)</label>
-                    <input type="number" id="loanRate" value="3" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                    <input type="number" id="loanRate" value="3" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
             </div>
         </div>
@@ -68,7 +69,7 @@
                             <th class="px-4 py-3 text-left font-semibold text-gray-700 w-48">當年大盤狀態判斷<br><span class="text-xs text-gray-500 font-normal">(依實況手動切換)</span></th>
                             <th class="px-4 py-3 text-left font-semibold text-gray-700 w-28">設定當年<br>實質報酬率</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700">當年需提領之<br>通膨生活費</th>
-                            <th class="px-4 py-3 text-left font-semibold text-gray-700 min-w-[280px]">📝 年度行動指示 (SOP)</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-700 min-w-[320px]">📝 年度操作指令與資金分配 (實務 SOP)</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700">年底 0050<br>資產餘額</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700">年底累積<br>質押負債</th>
                             <th class="px-4 py-3 text-right font-semibold text-gray-700">維持率</th>
@@ -83,49 +84,50 @@
     </div>
 
     <script>
-        const DURATION = 41; // 45 到 85 歲
+        const DURATION = 41; 
         let yearsData = [];
 
-        // 金錢格式化工具
         const formatMoney = (num) => {
             if (num < 0 && num > -1) num = 0;
             return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(num);
         };
 
-        // 初始化結構
         function initSimulation() {
-            const startAge = parseInt(document.getElementById('startAge').value);
-            const baseReturn = parseFloat(document.getElementById('baseReturn').value);
+            const startAge = parseInt(document.getElementById('startAge').value) || 45;
+            const baseReturn = parseFloat(document.getElementById('baseReturn').value) || 0;
             
-            yearsData = Array.from({ length: DURATION }, (_, i) => ({
-                age: startAge + i,
-                index: i,
-                marketState: 'normal', 
-                actualReturn: baseReturn
-            }));
+            // 如果 yearsData 尚未建立或長度不對，重新建立；若已存在，僅更新 age，保留手動狀態
+            if (yearsData.length !== DURATION) {
+                yearsData = Array.from({ length: DURATION }, (_, i) => ({
+                    index: i,
+                    marketState: 'normal', 
+                    actualReturn: baseReturn
+                }));
+            }
+            
+            yearsData.forEach((data, i) => {
+                data.age = startAge + i;
+            });
             
             calculateAndRender();
         }
 
-        // 下拉選單切換狀態
         function handleStateChange(index, newState) {
             yearsData[index].marketState = newState;
             const baseReturn = parseFloat(document.getElementById('baseReturn').value);
             
             if (newState === 'normal') yearsData[index].actualReturn = baseReturn;
-            if (newState === 'bear') yearsData[index].actualReturn = -20; // 預設熊市跌20%
-            if (newState === 'recovery') yearsData[index].actualReturn = 20; // 預設反彈漲20%
+            if (newState === 'bear') yearsData[index].actualReturn = -20; 
+            if (newState === 'recovery') yearsData[index].actualReturn = 20; 
             
             calculateAndRender();
         }
 
-        // 手動輸入特定報酬率
         function handleReturnChange(index, newReturn) {
             yearsData[index].actualReturn = parseFloat(newReturn) || 0;
             calculateAndRender();
         }
 
-        // 核心運算：提領、質押、還款邏輯
         function calculateAndRender() {
             const initialCapital = parseFloat(document.getElementById('initialCapital').value);
             const withdrawRate = parseFloat(document.getElementById('withdrawRate').value) / 100;
@@ -140,10 +142,8 @@
             tbody.innerHTML = '';
 
             yearsData.forEach((data) => {
-                // 1. 計算當年度通膨調整後生活費
                 let livingExpense = baseExpense * Math.pow(1 + inflationRate, data.index);
                 
-                // 2. 年初本金與負債隨報酬與利率變化 (紀錄年初利潤用於判斷是否足夠還款)
                 let capitalAtStartOfYear = currentCapital;
                 currentCapital = currentCapital * (1 + (data.actualReturn / 100));
                 let yearProfit = currentCapital - capitalAtStartOfYear; 
@@ -154,57 +154,53 @@
                 let rowBgClass = "";
                 let actionTextClass = "";
 
-                // --- 執行三種情境 SOP ---
-                
                 if (data.marketState === 'bear') {
-                    // 【熊市策略】：停止賣股，全數啟動質押借款支付生活費
                     currentDebt += livingExpense; 
                     rowBgClass = "bg-red-50/40";
-                    actionTextClass = "text-red-700 font-bold";
-                    actionText = `🚨 啟動質押護城河：【停止賣股】。向券商質押新增借款 ${formatMoney(livingExpense)} 支應生活，避免在低點賤賣資產。`;
+                    actionTextClass = "text-red-800";
+                    actionText = `🚨 <strong>【停止賣股】</strong>：不動用任何 0050。<br>
+                                  👉 <strong>資金來源</strong>：向券商新增質押借款 <span class="font-bold text-red-600">${formatMoney(livingExpense)}</span> 匯入戶頭作為今年生活費。`;
                 } 
                 
                 else if (data.marketState === 'recovery') {
-                    // 【大牛市策略】：一次性強制結清所有債務
                     let debtToPay = currentDebt;
-                    currentCapital -= (livingExpense + debtToPay); 
+                    let totalSell = livingExpense + debtToPay;
+                    currentCapital -= totalSell; 
                     currentDebt = 0;
                     rowBgClass = "bg-blue-50/40";
-                    actionTextClass = "text-blue-700 font-bold";
-                    actionText = `🚀 股市創高平倉：賣股變現 ${formatMoney(livingExpense)} 支應生活。並乘勝追擊加碼賣股 ${formatMoney(debtToPay)} 一次還清所有質押，債務歸零！`;
+                    actionTextClass = "text-blue-800";
+                    actionText = `🚀 <strong>【高點大平倉】</strong>：今年總共需賣出 <span class="font-bold text-blue-600">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>
+                                  👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(debtToPay)}</span> 直接償還券商，債務全數歸零！`;
                 } 
                 
                 else {
-                    // 【平常狀態策略】：賣股生活，並視獲利狀況「自動」償還質押
                     currentCapital -= livingExpense; 
                     
                     if (currentDebt > 0) {
-                        // 如果有欠債，計算今年獲利扣除生活費後，還有沒有閒錢可以還債
                         let surplusForDebt = yearProfit - livingExpense;
                         
                         if (surplusForDebt > 0) {
-                            // 有多餘獲利，自動啟動部分或全額還款
                             let payAmount = Math.min(surplusForDebt, currentDebt);
+                            let totalSell = livingExpense + payAmount;
                             currentCapital -= payAmount;
                             currentDebt -= payAmount;
                             
                             rowBgClass = "bg-green-50/30";
-                            actionTextClass = "text-green-700 font-medium";
-                            actionText = `✅ 賣股提領 ${formatMoney(livingExpense)} 支應生活。股市有多餘獲利，自動順便賣股償還 ${formatMoney(payAmount)} 質押貸款。`;
-                            if (currentDebt === 0) actionText += " (🎉 債務已全數結清)";
+                            actionTextClass = "text-green-800";
+                            actionText = `✅ <strong>【提領＋溫和還款】</strong>：今年總共需賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>
+                                          👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押本金。`;
+                            if (currentDebt === 0) actionText += " <span class="text-xs font-bold text-blue-600 ml-1">(🎉 債務已結清)</span>";
                         } else {
-                            // 獲利不夠還債，只做基本提領
                             actionTextClass = "text-gray-700";
-                            actionText = `✅ 賣股提領 ${formatMoney(livingExpense)} 支應生活。本年度獲利不足以額外還款，負債隨利息滾動。`;
+                            actionText = `✅ <strong>【純提領】</strong>：今年總共賣出 <span class="font-bold">${formatMoney(livingExpense)}</span> 的股票 (或領息) 作為生活費。<br>
+                                          <span class="text-gray-500 text-xs">⚠️ 股市獲利不足以額外還款，剩餘負債繼續隨利息滾動。</span>`;
                         }
                     } else {
-                        // 正常無債務狀態
                         actionTextClass = "text-gray-700";
-                        actionText = `✅ 賣股變現(或領息) ${formatMoney(livingExpense)} 支應生活。`;
+                        actionText = `✅ <strong>【正常提領】</strong>：今年只需賣出 <span class="font-bold">${formatMoney(livingExpense)}</span> 的股票 (或領息) 作為生活費。`;
                     }
                 }
 
-                // 邊界防護與維持率計算
                 if (currentCapital < 0) currentCapital = 0;
                 
                 let maintenanceRatio = currentDebt > 0 ? (currentCapital / currentDebt) * 100 : null;
@@ -214,17 +210,16 @@
                 if (maintenanceRatio !== null) {
                     ratioText = `${maintenanceRatio.toFixed(0)}%`;
                     if (maintenanceRatio >= 166) {
-                        ratioClass = "text-green-600 font-semibold bg-green-50 px-2 py-1 rounded"; // 安全
+                        ratioClass = "text-green-700 font-semibold bg-green-100 px-2 py-1 rounded"; 
                     } else if (maintenanceRatio >= 130) {
-                        ratioClass = "text-yellow-600 font-bold bg-yellow-50 px-2 py-1 rounded"; // 警戒
-                        actionText += " <br><span class='text-yellow-600 text-xs'>⚠️ 注意：維持率偏低，隨時留意大盤波動。</span>";
+                        ratioClass = "text-yellow-700 font-bold bg-yellow-100 px-2 py-1 rounded"; 
+                        actionText += "<br><span class='text-yellow-600 text-xs font-bold mt-1 inline-block'>⚠️ 注意：維持率偏低，留意大盤波動。</span>";
                     } else {
-                        ratioClass = "text-red-600 font-bold bg-red-100 px-2 py-1 rounded animate-pulse"; // 斷頭
-                        actionText += " <br><span class='text-red-600 text-xs font-bold'>💥 嚴重警告：維持率低於 130%，面臨斷頭強制賣股追繳風險！</span>";
+                        ratioClass = "text-red-700 font-bold bg-red-100 px-2 py-1 rounded animate-pulse"; 
+                        actionText += "<br><span class='text-red-600 text-xs font-bold mt-1 inline-block'>💥 嚴重警告：維持率低於 130%，面臨斷頭追繳風險！</span>";
                     }
                 }
 
-                // 產生表格行
                 const row = document.createElement('tr');
                 if (rowBgClass) row.className = rowBgClass;
 
@@ -243,17 +238,16 @@
                         </div>
                         <span class="hidden print:inline">${data.actualReturn}%</span>
                     </td>
-                    <td class="px-4 py-3 text-right text-gray-600 font-medium">${formatMoney(livingExpense)}</td>
+                    <td class="px-4 py-3 text-right text-gray-700 font-medium">${formatMoney(livingExpense)}</td>
                     <td class="px-4 py-3 ${actionTextClass} leading-relaxed">${actionText}</td>
                     <td class="px-4 py-3 text-right font-semibold ${currentCapital > 0 ? 'text-slate-800' : 'text-red-600'}">${formatMoney(currentCapital)}</td>
-                    <td class="px-4 py-3 text-right font-medium ${currentDebt > 0 ? 'text-red-500' : 'text-gray-300'}">${currentDebt > 0 ? formatMoney(currentDebt) : "-"}</td>
+                    <td class="px-4 py-3 text-right font-medium ${currentDebt > 0 ? 'text-red-600' : 'text-gray-300'}">${currentDebt > 0 ? formatMoney(currentDebt) : "-"}</td>
                     <td class="px-4 py-3 text-right text-sm">${ratioText !== "-" ? `<span class="${ratioClass}">${ratioText}</span>` : ratioText}</td>
                 `;
                 tbody.appendChild(row);
             });
         }
 
-        // 啟動渲染
         initSimulation();
     </script>
 </body>
