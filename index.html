@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>0050 退休動態提領戰情室 (雨天收傘實裝版)</title>
+    <title>0050 退休動態提領戰情室 (正利差套利版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @media print {
@@ -11,8 +11,8 @@
             body { background: white; padding: 0; }
             .shadow-sm { box-shadow: none; }
         }
-        /* 自訂核取方塊顏色 */
         .checkbox-umbrella:checked { background-color: #8b5cf6; border-color: #8b5cf6; }
+        .checkbox-arbitrage:checked { background-color: #10b981; border-color: #10b981; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
@@ -22,7 +22,7 @@
         <div class="flex flex-col md:flex-row justify-between items-end border-b pb-4 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-gray-900">0050 退休動態提領戰情室</h1>
-                <p class="text-gray-500 mt-1">動態護欄策略：熊市質押護城河 + ☂️ 雨天收傘緊縮提領</p>
+                <p class="text-gray-500 mt-1">動態護欄策略：熊市質押護城河 + 雨天收傘 + ⚖️ 正利差永續套利</p>
             </div>
             <button onclick="window.print()" class="no-print bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded shadow transition w-full md:w-auto">
                 🖨️ 列印報表 / 匯出 PDF
@@ -31,8 +31,12 @@
 
         <!-- 基礎參數設定區 -->
         <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 no-print">
-            <div class="flex items-center gap-2 mb-4 border-l-4 border-blue-500 pl-2">
+            <div class="flex justify-between items-center mb-4 border-l-4 border-blue-500 pl-2">
                 <h2 class="text-xl font-semibold text-gray-800">參數預設值 (可隨時微調)</h2>
+                <label class="flex items-center gap-2 cursor-pointer text-sm font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition">
+                    <input type="checkbox" id="arbitrageMode" class="checkbox-arbitrage rounded w-5 h-5 cursor-pointer focus:ring-emerald-500" onchange="initSimulation()" checked>
+                    ⚖️ 啟動正利差套利 (維持率 > 250% 時不還本)
+                </label>
             </div>
             
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
@@ -108,7 +112,7 @@
                     index: i,
                     marketState: 'normal', 
                     actualReturn: baseReturn,
-                    useUmbrella: false // 預設不開傘
+                    useUmbrella: false
                 }));
             }
             
@@ -119,18 +123,17 @@
             calculateAndRender();
         }
 
-        // 變更大盤狀態
         function handleStateChange(index, newState) {
             yearsData[index].marketState = newState;
             const baseReturn = parseFloat(document.getElementById('baseReturn').value);
             
             if (newState === 'normal') {
                 yearsData[index].actualReturn = baseReturn;
-                yearsData[index].useUmbrella = false; // 恢復正常時，預設把傘收起來
+                yearsData[index].useUmbrella = false; 
             }
             if (newState === 'bear') {
                 yearsData[index].actualReturn = -20; 
-                yearsData[index].useUmbrella = true; // 熊市預設強制開傘節流
+                yearsData[index].useUmbrella = true; 
             }
             if (newState === 'recovery') {
                 yearsData[index].actualReturn = 20; 
@@ -140,13 +143,11 @@
             calculateAndRender();
         }
 
-        // 手動輸入報酬率
         function handleReturnChange(index, newReturn) {
             yearsData[index].actualReturn = parseFloat(newReturn) || 0;
             calculateAndRender();
         }
 
-        // 手動開關雨天收傘
         function handleUmbrellaChange(index, isChecked) {
             yearsData[index].useUmbrella = isChecked;
             calculateAndRender();
@@ -158,7 +159,9 @@
             const inflationRate = parseFloat(document.getElementById('inflationRate').value) / 100;
             const loanRate = parseFloat(document.getElementById('loanRate').value) / 100;
             const umbrellaCutRate = parseFloat(document.getElementById('umbrellaCut').value) / 100;
+            const arbitrageMode = document.getElementById('arbitrageMode').checked;
             
+            const TARGET_SAFE_RATIO = 2.5; // 套利模式下的安全維持率底線 (250%)
             const baseExpense = initialCapital * withdrawRate;
 
             let currentCapital = initialCapital;
@@ -168,12 +171,9 @@
             tbody.innerHTML = '';
 
             yearsData.forEach((data) => {
-                // 1. 先計算「原本」應該領多少 (100%通膨)
                 let originalLivingExpense = baseExpense * Math.pow(1 + inflationRate, data.index);
-                
-                // 2. 如果今年有打勾「雨天收傘」，真正領出來的錢要打折
                 let actualLivingExpense = data.useUmbrella ? originalLivingExpense * (1 - umbrellaCutRate) : originalLivingExpense;
-                let savedMoney = originalLivingExpense - actualLivingExpense; // 省下的錢
+                let savedMoney = originalLivingExpense - actualLivingExpense; 
                 
                 let capitalAtStartOfYear = currentCapital;
                 currentCapital = currentCapital * (1 + (data.actualReturn / 100));
@@ -185,64 +185,81 @@
                 let rowBgClass = "";
                 let actionTextClass = "";
 
-                // --- 狀況 A：熊市 (借錢過活) ---
                 if (data.marketState === 'bear') {
-                    currentDebt += actualLivingExpense; // 以緊縮後的生活費去借錢
+                    currentDebt += actualLivingExpense; 
                     rowBgClass = "bg-red-50/40";
                     actionTextClass = "text-red-800";
-                    
-                    actionText = `🚨 <strong>【停止賣股】</strong>：不動用 0050。<br>👉 <strong>資金來源</strong>：向券商質押借款 <span class="font-bold text-red-600">${formatMoney(actualLivingExpense)}</span> 匯入戶頭作為生活費。`;
+                    actionText = `🚨 <strong>【停止賣股】</strong>：不動用 0050。<br>👉 <strong>資金來源</strong>：向券商質押借款 <span class="font-bold text-red-600">${formatMoney(actualLivingExpense)}</span> 作為生活費。`;
                     
                     if(data.useUmbrella) {
-                        actionText += `<br><span class="text-violet-700 text-xs font-bold bg-violet-100 px-1 py-0.5 rounded mt-1 inline-block">☂️ 已啟動雨天收傘：今年少借了 ${formatMoney(savedMoney)}，大幅降低債務壓力。</span>`;
+                        actionText += `<br><span class="text-violet-700 text-xs font-bold bg-violet-100 px-1 py-0.5 rounded mt-1 inline-block">☂️ 已啟動雨天收傘：少借了 ${formatMoney(savedMoney)}，防禦債務擴張。</span>`;
                     }
                 } 
-                
-                // --- 狀況 B：大牛市 (結清負債) ---
-                else if (data.marketState === 'recovery') {
+                else if (data.marketState === 'recovery' && !arbitrageMode) {
+                    // 保守模式的大反彈：全部結清
                     let debtToPay = currentDebt;
                     let totalSell = actualLivingExpense + debtToPay;
                     currentCapital -= totalSell; 
                     currentDebt = 0;
                     rowBgClass = "bg-blue-50/40";
                     actionTextClass = "text-blue-800";
-                    actionText = `🚀 <strong>【高點大平倉】</strong>：總賣出 <span class="font-bold text-blue-600">${formatMoney(totalSell)}</span>。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(actualLivingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(debtToPay)}</span> 直接償還券商，債務歸零！`;
+                    actionText = `🚀 <strong>【高點大平倉】</strong>：總賣出 <span class="font-bold text-blue-600">${formatMoney(totalSell)}</span>。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(actualLivingExpense)}</span> 為生活費；剩下 <span class="font-bold">${formatMoney(debtToPay)}</span> 結清券商債務！`;
                 } 
-                
-                // --- 狀況 C：平常/牛市 (賣股度日) ---
                 else {
+                    // 平常、牛市，或是套利模式下的反彈
                     currentCapital -= actualLivingExpense; 
                     
                     if (currentDebt > 0) {
-                        // 有欠債
                         let surplusForDebt = yearProfit - actualLivingExpense;
+                        let maintenanceRatioBeforePay = currentCapital / currentDebt;
                         
                         if (surplusForDebt > 0) {
-                            // 獲利夠還債
-                            let payAmount = Math.min(surplusForDebt, currentDebt);
-                            let totalSell = actualLivingExpense + payAmount;
-                            currentCapital -= payAmount;
-                            currentDebt -= payAmount;
+                            let payAmount = 0;
                             
-                            rowBgClass = "bg-green-50/30";
-                            actionTextClass = "text-green-800";
-                            actionText = `✅ <strong>【提領＋溫和還款】</strong>：總賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span>。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(actualLivingExpense)}</span> 為生活費；剩下的 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押本金。`;
+                            if (arbitrageMode) {
+                                if (maintenanceRatioBeforePay >= TARGET_SAFE_RATIO) {
+                                    // 套利模式 & 維持率極度安全 -> 不主動還本
+                                    payAmount = 0;
+                                    rowBgClass = "bg-emerald-50/30";
+                                    actionTextClass = "text-emerald-800";
+                                    actionText = `⚖️ <strong>【正利差套利】</strong>：僅賣出 <span class="font-bold">${formatMoney(actualLivingExpense)}</span> 作為生活費。<br><span class="text-emerald-700 text-xs font-bold">目前維持率極度安全，暫不還本，保留資產在市場享受 ${data.actualReturn}% 複利！</span>`;
+                                } else {
+                                    // 套利模式但維持率偏低 -> 溫和還款直到回到 250% 或耗盡剩餘獲利
+                                    let requiredPay = (TARGET_SAFE_RATIO * currentDebt - currentCapital) / (TARGET_SAFE_RATIO - 1);
+                                    payAmount = Math.min(surplusForDebt, currentDebt, requiredPay > 0 ? requiredPay : 0);
+                                    let totalSell = actualLivingExpense + payAmount;
+                                    currentCapital -= payAmount;
+                                    currentDebt -= payAmount;
+                                    
+                                    rowBgClass = "bg-green-50/30";
+                                    actionTextClass = "text-green-800";
+                                    actionText = `🛡️ <strong>【降槓桿防禦】</strong>：總賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span>。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(actualLivingExpense)}</span> 為生活費；剩下 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押，以確保維持率重回安全水位。`;
+                                }
+                            } else {
+                                // 保守模式 -> 有多餘獲利就全砸去還債
+                                payAmount = Math.min(surplusForDebt, currentDebt);
+                                let totalSell = actualLivingExpense + payAmount;
+                                currentCapital -= payAmount;
+                                currentDebt -= payAmount;
+                                
+                                rowBgClass = "bg-green-50/30";
+                                actionTextClass = "text-green-800";
+                                actionText = `✅ <strong>【提領＋溫和還款】</strong>：總賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span>。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(actualLivingExpense)}</span> 為生活費；剩下 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押本金。`;
+                                if (currentDebt === 0) actionText += ` <span class="text-xs font-bold text-blue-600 ml-1">(🎉 債務結清)</span>`;
+                            }
                             
-                            if (currentDebt === 0) actionText += ` <span class="text-xs font-bold text-blue-600 ml-1">(🎉 債務結清)</span>`;
                         } else {
-                            // 獲利不夠還債，發出警訊
                             actionTextClass = "text-gray-700";
                             rowBgClass = "bg-yellow-50/30";
-                            actionText = `⚠️ <strong>【純提領 (無力還債)】</strong>：賣出 <span class="font-bold">${formatMoney(actualLivingExpense)}</span> 作為生活費。<br><span class="text-yellow-700 text-xs font-bold">警訊：今年資產獲利已跟不上提領與利息消耗，淨值正在倒退。</span>`;
+                            actionText = `⚠️ <strong>【純提領 (無力還債)】</strong>：賣出 <span class="font-bold">${formatMoney(actualLivingExpense)}</span> 作為生活費。<br><span class="text-yellow-700 text-xs font-bold">警訊：今年資產獲利已跟不上提領與利息消耗。</span>`;
                         }
                     } else {
-                        // 沒欠債的正常年
                         actionTextClass = "text-gray-700";
                         actionText = `✅ <strong>【正常提領】</strong>：賣出 <span class="font-bold">${formatMoney(actualLivingExpense)}</span> 作為生活費。`;
                     }
                     
                     if(data.useUmbrella) {
-                        actionText += `<br><span class="text-violet-700 text-xs font-bold bg-violet-100 px-1 py-0.5 rounded mt-1 inline-block">☂️ 已啟動雨天收傘：今年少賣了 ${formatMoney(savedMoney)} 股票，讓它們留在帳上防禦！</span>`;
+                        actionText += `<br><span class="text-violet-700 text-xs font-bold bg-violet-100 px-1 py-0.5 rounded mt-1 inline-block">☂️ 已啟動雨天收傘：少賣了 ${formatMoney(savedMoney)} 股票防禦！</span>`;
                     }
                 }
 
@@ -254,7 +271,9 @@
                 
                 if (maintenanceRatio !== null) {
                     ratioText = `${maintenanceRatio.toFixed(0)}%`;
-                    if (maintenanceRatio >= 166) {
+                    if (maintenanceRatio >= 250) {
+                        ratioClass = "text-emerald-700 font-bold bg-emerald-100 px-2 py-1 rounded"; 
+                    } else if (maintenanceRatio >= 166) {
                         ratioClass = "text-green-700 font-semibold bg-green-100 px-2 py-1 rounded"; 
                     } else if (maintenanceRatio >= 130) {
                         ratioClass = "text-yellow-700 font-bold bg-yellow-100 px-2 py-1 rounded"; 
