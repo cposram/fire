@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>0050 退休動態提領戰情室</title>
+    <title>0050 退休動態提領戰情室 (實務操作清晰版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @media print {
@@ -33,7 +33,6 @@
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">起始年齡</label>
-                    <!-- 解除 readonly，加入 onchange 觸發重算 -->
                     <input type="number" id="startAge" value="45" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
                 <div>
@@ -54,7 +53,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">質押借款利率 (%)</label>
-                    <input type="number" id="loanRate" value="4" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
+                    <input type="number" id="loanRate" value="3.91" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" onchange="initSimulation()">
                 </div>
             </div>
         </div>
@@ -96,7 +95,6 @@
             const startAge = parseInt(document.getElementById('startAge').value) || 45;
             const baseReturn = parseFloat(document.getElementById('baseReturn').value) || 0;
             
-            // 如果 yearsData 尚未建立或長度不對，重新建立；若已存在，僅更新 age，保留手動狀態
             if (yearsData.length !== DURATION) {
                 yearsData = Array.from({ length: DURATION }, (_, i) => ({
                     index: i,
@@ -158,8 +156,7 @@
                     currentDebt += livingExpense; 
                     rowBgClass = "bg-red-50/40";
                     actionTextClass = "text-red-800";
-                    actionText = `🚨 <strong>【停止賣股】</strong>：不動用任何 0050。<br>
-                                  👉 <strong>資金來源</strong>：向券商新增質押借款 <span class="font-bold text-red-600">${formatMoney(livingExpense)}</span> 匯入戶頭作為今年生活費。`;
+                    actionText = `🚨 <strong>【停止賣股】</strong>：不動用任何 0050。<br>👉 <strong>資金來源</strong>：向券商新增質押借款 <span class="font-bold text-red-600">${formatMoney(livingExpense)}</span> 匯入戶頭作為今年生活費。`;
                 } 
                 
                 else if (data.marketState === 'recovery') {
@@ -169,8 +166,7 @@
                     currentDebt = 0;
                     rowBgClass = "bg-blue-50/40";
                     actionTextClass = "text-blue-800";
-                    actionText = `🚀 <strong>【高點大平倉】</strong>：今年總共需賣出 <span class="font-bold text-blue-600">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>
-                                  👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(debtToPay)}</span> 直接償還券商，債務全數歸零！`;
+                    actionText = `🚀 <strong>【高點大平倉】</strong>：今年總共需賣出 <span class="font-bold text-blue-600">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(debtToPay)}</span> 直接償還券商，債務全數歸零！`;
                 } 
                 
                 else {
@@ -187,13 +183,13 @@
                             
                             rowBgClass = "bg-green-50/30";
                             actionTextClass = "text-green-800";
-                            actionText = `✅ <strong>【提領＋溫和還款】</strong>：今年總共需賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>
-                                          👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押本金。`;
-                            if (currentDebt === 0) actionText += " <span class="text-xs font-bold text-blue-600 ml-1">(🎉 債務已結清)</span>";
+                            actionText = `✅ <strong>【提領＋溫和還款】</strong>：今年總共需賣出 <span class="font-bold text-green-700">${formatMoney(totalSell)}</span> 的股票 (或領息)。<br>👉 <strong>資金分配</strong>：<span class="font-bold">${formatMoney(livingExpense)}</span> 提領為生活費；剩下的 <span class="font-bold">${formatMoney(payAmount)}</span> 償還質押本金。`;
+                            
+                            // 修正引號錯誤處
+                            if (currentDebt === 0) actionText += ` <span class="text-xs font-bold text-blue-600 ml-1">(🎉 債務已結清)</span>`;
                         } else {
                             actionTextClass = "text-gray-700";
-                            actionText = `✅ <strong>【純提領】</strong>：今年總共賣出 <span class="font-bold">${formatMoney(livingExpense)}</span> 的股票 (或領息) 作為生活費。<br>
-                                          <span class="text-gray-500 text-xs">⚠️ 股市獲利不足以額外還款，剩餘負債繼續隨利息滾動。</span>`;
+                            actionText = `✅ <strong>【純提領】</strong>：今年總共賣出 <span class="font-bold">${formatMoney(livingExpense)}</span> 的股票 (或領息) 作為生活費。<br><span class="text-gray-500 text-xs">⚠️ 股市獲利不足以額外還款，剩餘負債繼續隨利息滾動。</span>`;
                         }
                     } else {
                         actionTextClass = "text-gray-700";
@@ -213,10 +209,10 @@
                         ratioClass = "text-green-700 font-semibold bg-green-100 px-2 py-1 rounded"; 
                     } else if (maintenanceRatio >= 130) {
                         ratioClass = "text-yellow-700 font-bold bg-yellow-100 px-2 py-1 rounded"; 
-                        actionText += "<br><span class='text-yellow-600 text-xs font-bold mt-1 inline-block'>⚠️ 注意：維持率偏低，留意大盤波動。</span>";
+                        actionText += `<br><span class="text-yellow-600 text-xs font-bold mt-1 inline-block">⚠️ 注意：維持率偏低，留意大盤波動。</span>`;
                     } else {
                         ratioClass = "text-red-700 font-bold bg-red-100 px-2 py-1 rounded animate-pulse"; 
-                        actionText += "<br><span class='text-red-600 text-xs font-bold mt-1 inline-block'>💥 嚴重警告：維持率低於 130%，面臨斷頭追繳風險！</span>";
+                        actionText += `<br><span class="text-red-600 text-xs font-bold mt-1 inline-block">💥 嚴重警告：維持率低於 130%，面臨斷頭追繳風險！</span>`;
                     }
                 }
 
