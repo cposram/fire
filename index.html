@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0050 退休動態提領與質押策略儀表板</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; padding: 0; }
+            .shadow-lg { box-shadow: none; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 p-4 md:p-8 font-sans">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- 標頭 -->
+        <div class="flex justify-between items-end border-b pb-4">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">0050 退休動態提領戰情室</h1>
+                <p class="text-gray-500 mt-1">動態護欄策略：牛市賣股 / 熊市質押 / 復甦還清</p>
+            </div>
+            <button onclick="window.print()" class="no-print bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow transition">
+                列印報表 / 匯出 PDF
+            </button>
+        </div>
+
+        <!-- 基礎參數設定區 -->
+        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 no-print">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">基礎參數設定 (可自行微調)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">起始年齡</label>
+                    <input type="number" id="startAge" value="45" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2 bg-gray-50 text-gray-500" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">起始本金 (元)</label>
+                    <input type="number" id="initialCapital" value="20000000" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">初始提領率 (%)</label>
+                    <input type="number" id="withdrawRate" value="4" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">通膨率 (%)</label>
+                    <input type="number" id="inflationRate" value="2" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">平時預估報酬 (%)</label>
+                    <input type="number" id="baseReturn" value="8" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">質押利率 (%)</label>
+                    <input type="number" id="loanRate" value="3" class="mt-1 block w-full rounded border-gray-300 shadow-sm border p-2" onchange="initSimulation()">
+                </div>
+            </div>
+        </div>
+
+        <!-- 模擬與策略指示表 -->
+        <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600">年齡 (年度)</th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600 w-48">當年大盤狀態判斷<br><span class="text-xs text-gray-400">(可手動切換)</span></th>
+                            <th class="px-4 py-3 text-left font-semibold text-gray-600 w-32">當年實質報酬率</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">通膨調整後生活費</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">年度行動指示 (SOP)</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">年底資產餘額</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">累積質押負債</th>
+                            <th class="px-4 py-3 text-right font-semibold text-gray-600">維持率</th>
+                        </tr>
+                    </thead>
+                    <tbody id="simulationTable" class="divide-y divide-gray-200 bg-white">
+                        <!-- JS 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const DURATION = 41; // 45 歲到 85 歲共 41 年
+        let yearsData = [];
+
+        // 格式化金錢
+        const formatMoney = (num) => {
+            if (num < 0 && num > -1) num = 0;
+            return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(num);
+        };
+
+        // 初始化資料結構
+        function initSimulation() {
+            const startAge = parseInt(document.getElementById('startAge').value);
+            const baseReturn = parseFloat(document.getElementById('baseReturn').value);
+            
+            yearsData = Array.from({ length: DURATION }, (_, i) => ({
+                age: startAge + i,
+                index: i,
+                marketState: 'normal', // 預設常態
+                actualReturn: baseReturn
+            }));
+            
+            calculateAndRender();
+        }
+
+        // 當使用者改變某一年的大盤狀態時
+        function handleStateChange(index, newState) {
+            yearsData[index].marketState = newState;
+            const baseReturn = parseFloat(document.getElementById('baseReturn').value);
+            
+            // 根據狀態預設帶入典型報酬率，使用者也可後續手動改
+            if (newState === 'normal') yearsData[index].actualReturn = baseReturn;
+            if (newState === 'bear') yearsData[index].actualReturn = -20; // 熊市預設跌 20%
+            if (newState === 'recovery') yearsData[index].actualReturn = 20; // 復甦預設彈 20%
+            
+            calculateAndRender();
+        }
+
+        // 當使用者手動微調某一年報酬率時
+        function handleReturnChange(index, newReturn) {
+            yearsData[index].actualReturn = parseFloat(newReturn) || 0;
+            calculateAndRender();
+        }
+
+        // 核心財務運算與渲染
+        function calculateAndRender() {
+            const initialCapital = parseFloat(document.getElementById('initialCapital').value);
+            const withdrawRate = parseFloat(document.getElementById('withdrawRate').value) / 100;
+            const inflationRate = parseFloat(document.getElementById('inflationRate').value) / 100;
+            const loanRate = parseFloat(document.getElementById('loanRate').value) / 100;
+            const baseExpense = initialCapital * withdrawRate;
+
+            let currentCapital = initialCapital;
+            let currentDebt = 0;
+
+            const tbody = document.getElementById('simulationTable');
+            tbody.innerHTML = '';
+
+            yearsData.forEach((data) => {
+                // 計算當年度生活費 (隨通膨成長)
+                let livingExpense = baseExpense * Math.pow(1 + inflationRate, data.index);
+                
+                // 1. 資產與負債依據市場報酬與利率成長 (年初先反映漲跌)
+                currentCapital = currentCapital * (1 + (data.actualReturn / 100));
+                currentDebt = currentDebt * (1 + loanRate);
+
+                let actionText = "";
+                let actionClass = "";
+
+                // 2. 執行策略指示 SOP
+                if (data.marketState === 'normal') {
+                    currentCapital -= livingExpense; // 賣股提領
+                    actionText = `✅ 賣出股票 (或領息) 變現 ${formatMoney(livingExpense)} 支應生活費。`;
+                    actionClass = "text-green-700";
+                    if(currentDebt > 0) actionText += " (注意：尚有未還質押，建議等股市創高時還清)";
+                } 
+                else if (data.marketState === 'bear') {
+                    currentDebt += livingExpense; // 質押借款
+                    actionText = `🚨 【停止賣股】。向券商質押借出 ${formatMoney(livingExpense)} 支應生活費，保護資產免遭低點賤賣。`;
+                    actionClass = "text-red-600 font-bold bg-red-50";
+                } 
+                else if (data.marketState === 'recovery') {
+                    let debtToPay = currentDebt;
+                    currentCapital -= (livingExpense + debtToPay); // 賣股提領 + 還清負債
+                    currentDebt = 0;
+                    actionText = `🚀 【高點結清】。賣股變現 ${formatMoney(livingExpense)} 支應生活，並加碼賣股 ${formatMoney(debtToPay)} 還清所有質押債務，債務歸零。`;
+                    actionClass = "text-blue-700 font-bold bg-blue-50";
+                }
+
+                // 邊界防護與維持率計算
+                if (currentCapital < 0) currentCapital = 0;
+                let maintenanceRatio = currentDebt > 0 ? (currentCapital / currentDebt) * 100 : Infinity;
+                let ratioText = currentDebt > 0 ? `${maintenanceRatio.toFixed(0)}%` : "-";
+                let ratioClass = maintenanceRatio < 166 ? (maintenanceRatio < 130 ? "text-red-600 font-bold" : "text-yellow-600") : "text-gray-500";
+                
+                if(maintenanceRatio < 130 && currentDebt > 0) {
+                    actionText += " ⚠️警告：維持率低於130%，面臨斷頭追繳風險！";
+                }
+
+                // 產生表格行
+                const row = document.createElement('tr');
+                if(data.marketState === 'bear') row.className = "bg-red-50/30";
+                if(data.marketState === 'recovery') row.className = "bg-blue-50/30";
+
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium">${data.age} 歲 <span class="text-xs text-gray-400">(第${data.index + 1}年)</span></td>
+                    <td class="px-4 py-3 no-print">
+                        <select onchange="handleStateChange(${data.index}, this.value)" class="border rounded p-1 text-sm bg-white shadow-sm w-full">
+                            <option value="normal" ${data.marketState === 'normal' ? 'selected' : ''}>✅ 平常 / 牛市</option>
+                            <option value="bear" ${data.marketState === 'bear' ? 'selected' : ''}>📉 熊市 (回檔>20%)</option>
+                            <option value="recovery" ${data.marketState === 'recovery' ? 'selected' : ''}>📈 復甦 (反彈創高)</option>
+                        </select>
+                    </td>
+                    <td class="px-4 py-3">
+                        <div class="flex items-center gap-1 no-print">
+                            <input type="number" value="${data.actualReturn}" onchange="handleReturnChange(${data.index}, this.value)" class="border rounded p-1 w-16 text-right text-sm">%
+                        </div>
+                        <span class="hidden print:inline">${data.actualReturn}%</span>
+                    </td>
+                    <td class="px-4 py-3 text-right text-gray-700">${formatMoney(livingExpense)}</td>
+                    <td class="px-4 py-3 text-right ${actionClass}">${actionText}</td>
+                    <td class="px-4 py-3 text-right font-semibold ${currentCapital > 0 ? 'text-gray-900' : 'text-red-600'}">${formatMoney(currentCapital)}</td>
+                    <td class="px-4 py-3 text-right ${currentDebt > 0 ? 'text-red-500 font-medium' : 'text-gray-400'}">${formatMoney(currentDebt)}</td>
+                    <td class="px-4 py-3 text-right ${ratioClass}">${ratioText}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 啟動
+        initSimulation();
+    </script>
+</body>
+</html>
